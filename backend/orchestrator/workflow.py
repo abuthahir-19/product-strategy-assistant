@@ -81,12 +81,34 @@ def _get(name: str):
 #  Safe runner                                                         #
 # ------------------------------------------------------------------ #
 
+def _classify_error(agent_key: str, exc: Exception) -> str:
+    """Return a readable error message, detecting common failure modes."""
+    msg = str(exc)
+    if "<!DOCTYPE" in msg or "<html" in msg.lower() or "McAfee" in msg:
+        return (
+            f"{agent_key}: Request blocked by a corporate network proxy (McAfee / firewall). "
+            "The LLM gateway is unreachable from this network. "
+            "Fix: use the Render-deployed backend, switch to a mobile hotspot, "
+            "or ask IT to whitelist keygateway.arshnivlabs.com."
+        )
+    if "Connection error" in msg or "ConnectError" in msg:
+        return (
+            f"{agent_key}: Cannot reach the LLM gateway — check OPENAI_BASE_URL "
+            "and network connectivity."
+        )
+    if "timeout" in msg.lower() or "Timeout" in msg:
+        return f"{agent_key}: LLM call timed out after 90 s — gateway may be overloaded."
+    if "401" in msg or "403" in msg or "Unauthorized" in msg:
+        return f"{agent_key}: Invalid or expired API key — check OPENAI_API_KEY."
+    return f"{agent_key} error: {msg[:300]}"
+
+
 def _safe_run(agent_key: str, state: dict) -> dict:
     try:
         return _get(agent_key).run(dict(state))
     except Exception as exc:
         state = dict(state)
-        state["error"] = f"{agent_key} error: {exc}"
+        state["error"] = _classify_error(agent_key, exc)
         return state
 
 
