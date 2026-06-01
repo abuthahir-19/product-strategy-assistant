@@ -1,6 +1,7 @@
 """LangGraph multi-agent orchestration workflow."""
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Optional
 
 import httpx
@@ -77,64 +78,112 @@ def _get(name: str):
 
 
 # ------------------------------------------------------------------ #
-#  Node functions                                                      #
+#  Safe runner                                                         #
 # ------------------------------------------------------------------ #
 
-def _safe_run(agent_key: str, state: ProductStrategyState) -> ProductStrategyState:
+def _safe_run(agent_key: str, state: dict) -> dict:
     try:
         return _get(agent_key).run(dict(state))
     except Exception as exc:
+        state = dict(state)
         state["error"] = f"{agent_key} error: {exc}"
         return state
 
 
-def customer_feedback_node(state: ProductStrategyState) -> ProductStrategyState:
-    state["current_step"] = "Running Customer Feedback Agent..."
-    return _safe_run("customer_feedback", state)
+# ------------------------------------------------------------------ #
+#  Node 1 — Parallel: Customer Feedback + Market Research +           #
+#            Competitor Analysis (independent, no shared inputs)      #
+# ------------------------------------------------------------------ #
+
+# Maps agent key → output field written by that agent
+_PARALLEL_AGENTS = {
+    "customer_feedback":  "customer_insights",
+    "market_research":    "market_research",
+    "competitor_analysis":"competitor_analysis",
+}
 
 
-def market_research_node(state: ProductStrategyState) -> ProductStrategyState:
-    state["current_step"] = "Running Market Research Agent..."
-    return _safe_run("market_research", state)
+def parallel_analysis_node(state: ProductStrategyState) -> ProductStrategyState:
+    """
+    Run the first three agents concurrently using a thread pool.
+    They share nothing from each other, so parallelism is safe.
+    Cuts this phase from ~3 sequential calls to 1 concurrent batch.
+    """
+    state["current_step"] = (
+        "Running Customer Feedback, Market Research & "
+        "Competitor Analysis in parallel…"
+    )
+
+    def _run(agent_key: str) -> dict:
+        return _safe_run(agent_key, state)
+
+    results: dict[str, dict] = {}
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        future_map = {pool.submit(_run, key): key for key in _PARALLEL_AGENTS}
+        for future in as_completed(future_map):
+            key = future_map[future]
+            try:
+                results[key] = future.result()
+            except Exception as exc:
+                results[key] = {"error": str(exc)}
+
+    # Merge each agent's output field back into the shared state
+    for agent_key, output_field in _PARALLEL_AGENTS.items():
+        value = results.get(agent_key, {}).get(output_field)
+        if value:
+            state[output_field] = value
+
+    # Collect any errors
+    errors = [
+        f"{k}: {r['error']}"
+        for k, r in results.items()
+        if r.get("error")
+    ]
+    if errors:
+        state["error"] = " | ".join(errors)
+
+    state["current_step"] = "Phase 1 complete — running SWOT Analysis…"
+    return state
 
 
-def competitor_analysis_node(state: ProductStrategyState) -> ProductStrategyState:
-    state["current_step"] = "Running Competitor Analysis Agent..."
-    return _safe_run("competitor_analysis", state)
-
+# ------------------------------------------------------------------ #
+#  Nodes 2-5 — Sequential (each depends on upstream outputs)         #
+# ------------------------------------------------------------------ #
 
 def swot_analysis_node(state: ProductStrategyState) -> ProductStrategyState:
-    state["current_step"] = "Running SWOT Analysis Agent..."
+    state["current_step"] = "Running SWOT Analysis Agent…"
     return _safe_run("swot_analysis", state)
 
 
 def feature_prioritization_node(state: ProductStrategyState) -> ProductStrategyState:
-    state["current_step"] = "Running Feature Prioritization Agent..."
+    state["current_step"] = "Running Feature Prioritization Agent…"
     return _safe_run("feature_prioritization", state)
 
 
 def strategy_recommendation_node(state: ProductStrategyState) -> ProductStrategyState:
-    state["current_step"] = "Running Strategy Recommendation Agent..."
+    state["current_step"] = "Running Strategy Recommendation Agent…"
     return _safe_run("strategy_recommendation", state)
 
 
 def executive_report_node(state: ProductStrategyState) -> ProductStrategyState:
-    state["current_step"] = "Running Executive Report Agent..."
+    state["current_step"] = "Running Executive Report Agent…"
     return _safe_run("executive_report", state)
 
 
+# ------------------------------------------------------------------ #
+#  Chat node                                                           #
+# ------------------------------------------------------------------ #
+
 def chat_node(state: ProductStrategyState) -> ProductStrategyState:
     """RAG-powered conversational node."""
-    state["current_step"] = "Generating chat response..."
+    state["current_step"] = "Generating chat response…"
     try:
         store = ChromaVectorStore()
         query = state.get("query", "")
         history = state.get("chat_history", [])
 
-        # Retrieve relevant document chunks
-        doc_ctx = store.get_context(query, k=6)
+        doc_ctx = store.get_context(query, k=4)
 
-        # Include summaries from any completed analyses
         analysis_ctx = ""
         for key in [
             "customer_insights", "market_research", "competitor_analysis",
@@ -142,9 +191,8 @@ def chat_node(state: ProductStrategyState) -> ProductStrategyState:
         ]:
             val = (state.get(key) or "").strip()
             if val:
-                analysis_ctx += f"\n\n[{key.replace('_', ' ').title()}]\n{val[:400]}..."
+                analysis_ctx += f"\n\n[{key.replace('_', ' ').title()}]\n{val[:350]}…"
 
-        # Build recent conversation history (last 6 turns)
         history_str = "\n".join(
             f"{m['role'].capitalize()}: {m['content']}"
             for m in history[-6:]
@@ -157,18 +205,20 @@ def chat_node(state: ProductStrategyState) -> ProductStrategyState:
             "Keep answers concise but complete."
         )
 
-        user_content = f"""Document Context:
-{doc_ctx if doc_ctx else "No documents uploaded yet."}
+        user_content = (
+            f"Document Context:\n{doc_ctx or 'No documents uploaded yet.'}\n\n"
+            f"Analysis Results:\n{analysis_ctx or 'No analysis run yet.'}\n\n"
+            f"Conversation History:\n{history_str or 'No prior messages.'}\n\n"
+            f"User Question: {query}"
+        )
 
-Analysis Results:
-{analysis_ctx if analysis_ctx else "No analysis run yet."}
-
-Conversation History:
-{history_str if history_str else "No prior messages."}
-
-User Question: {query}"""
-
-        llm = ChatOpenAI(model=LLM_MODEL, api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL, temperature=0.4, http_client=_HTTP_CLIENT)
+        llm = ChatOpenAI(
+            model=LLM_MODEL,
+            api_key=OPENAI_API_KEY,
+            base_url=OPENAI_BASE_URL,
+            temperature=0.4,
+            http_client=_HTTP_CLIENT,
+        )
         response = llm.invoke([
             SystemMessage(content=system_prompt),
             HumanMessage(content=user_content),
@@ -185,7 +235,7 @@ User Question: {query}"""
 # ------------------------------------------------------------------ #
 
 def _router(state: ProductStrategyState) -> str:
-    return "chat" if state.get("mode") == "chat" else "customer_feedback"
+    return "chat" if state.get("mode") == "chat" else "parallel_analysis"
 
 
 # ------------------------------------------------------------------ #
@@ -195,36 +245,29 @@ def _router(state: ProductStrategyState) -> str:
 def _build_graph():
     g = StateGraph(ProductStrategyState)
 
-    # Register nodes
-    g.add_node("customer_feedback", customer_feedback_node)
-    g.add_node("market_research", market_research_node)
-    g.add_node("competitor_analysis", competitor_analysis_node)
-    g.add_node("swot_analysis", swot_analysis_node)
+    g.add_node("parallel_analysis",      parallel_analysis_node)
+    g.add_node("swot_analysis",          swot_analysis_node)
     g.add_node("feature_prioritization", feature_prioritization_node)
-    g.add_node("strategy_recommendation", strategy_recommendation_node)
-    g.add_node("executive_report", executive_report_node)
-    g.add_node("chat", chat_node)
+    g.add_node("strategy_recommendation",strategy_recommendation_node)
+    g.add_node("executive_report",       executive_report_node)
+    g.add_node("chat",                   chat_node)
 
-    # Entry-point routing
     g.add_conditional_edges(
         START,
         _router,
         {
-            "chat": "chat",
-            "customer_feedback": "customer_feedback",
+            "chat":              "chat",
+            "parallel_analysis": "parallel_analysis",
         },
     )
 
-    # Sequential analysis pipeline
-    g.add_edge("customer_feedback", "market_research")
-    g.add_edge("market_research", "competitor_analysis")
-    g.add_edge("competitor_analysis", "swot_analysis")
-    g.add_edge("swot_analysis", "feature_prioritization")
-    g.add_edge("feature_prioritization", "strategy_recommendation")
+    # Analysis pipeline — parallel phase then sequential synthesis
+    g.add_edge("parallel_analysis",       "swot_analysis")
+    g.add_edge("swot_analysis",           "feature_prioritization")
+    g.add_edge("feature_prioritization",  "strategy_recommendation")
     g.add_edge("strategy_recommendation", "executive_report")
-    g.add_edge("executive_report", END)
+    g.add_edge("executive_report",        END)
 
-    # Chat exits immediately
     g.add_edge("chat", END)
 
     return g.compile()
@@ -257,13 +300,13 @@ def _blank_state() -> ProductStrategyState:
         feature_priorities=None,
         strategy_recommendations=None,
         executive_summary=None,
-        current_step="Initialising",
+        current_step="Initialising…",
         error=None,
     )
 
 
 def run_analysis(seed: Optional[dict] = None) -> dict:
-    """Run the full 7-agent analysis pipeline and return the final state."""
+    """Run the full pipeline and return the final state."""
     state = _blank_state()
     if seed:
         state.update(seed)
@@ -275,7 +318,6 @@ def run_chat(query: str, chat_history: List[dict], analysis_state: Optional[dict
     """Run the RAG chat node and return the updated state."""
     state = _blank_state()
     if analysis_state:
-        # Carry forward completed analysis outputs
         for key in [
             "customer_insights", "market_research", "competitor_analysis",
             "swot_analysis", "feature_priorities", "strategy_recommendations",

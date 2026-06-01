@@ -47,7 +47,7 @@ class BaseAgent:
     def retrieve(
         self,
         query: str,
-        k: int = 6,
+        k: int = 4,
         doc_type: Optional[str] = None,
     ) -> str:
         """Return joined text chunks from the vector store."""

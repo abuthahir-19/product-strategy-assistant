@@ -281,31 +281,43 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 🤖 Agent Pipeline")
 
-    AGENTS = [
-        ("Customer Feedback Agent",      "customer_insights"),
-        ("Market Research Agent",        "market_research"),
-        ("Competitor Analysis Agent",    "competitor_analysis"),
-        ("SWOT Analysis Agent",          "swot_analysis"),
-        ("Feature Prioritization Agent", "feature_priorities"),
-        ("Strategy Recommendation Agent","strategy_recommendations"),
-        ("Executive Report Agent",       "executive_summary"),
+    # Phase 1 groups 3 agents that run in parallel
+    PIPELINE = [
+        ("Phase 1 ⚡ Parallel",
+         "Customer Feedback · Market Research · Competitor Analysis",
+         ["customer_insights", "market_research", "competitor_analysis"]),
+        ("Phase 2",  "SWOT Analysis Agent",               ["swot_analysis"]),
+        ("Phase 3",  "Feature Prioritization Agent",       ["feature_priorities"]),
+        ("Phase 4",  "Strategy Recommendation Agent",      ["strategy_recommendations"]),
+        ("Phase 5",  "Executive Report Agent",             ["executive_summary"]),
     ]
 
     results_now = get_results()
     completed_keys = set()
     if results_now.get("completed") and results_now.get("data"):
         d = results_now["data"]
-        for _, k in AGENTS:
-            if d.get(k):
-                completed_keys.add(k)
+        for _, _, keys in PIPELINE:
+            for k in keys:
+                if d.get(k):
+                    completed_keys.add(k)
 
-    for i, (agent_name, key) in enumerate(AGENTS, 1):
-        if key in completed_keys:
-            st.markdown(f'<span class="badge-done">✅ {i}. {agent_name}</span>', unsafe_allow_html=True)
+    for i, (phase, label, keys) in enumerate(PIPELINE, 1):
+        phase_done = all(k in completed_keys for k in keys)
+        if phase_done:
+            st.markdown(
+                f'<span class="badge-done">✅ {phase}: {label}</span>',
+                unsafe_allow_html=True,
+            )
         elif status.get("running"):
-            st.markdown(f'<span class="badge-running">⏳ {i}. {agent_name}</span>', unsafe_allow_html=True)
+            st.markdown(
+                f'<span class="badge-running">⏳ {phase}: {label}</span>',
+                unsafe_allow_html=True,
+            )
         else:
-            st.markdown(f'<span class="badge-pending">⬜ {i}. {agent_name}</span>', unsafe_allow_html=True)
+            st.markdown(
+                f'<span class="badge-pending">⬜ {phase}: {label}</span>',
+                unsafe_allow_html=True,
+            )
 
 # ------------------------------------------------------------------ #
 #  Auto-poll while running                                             #
