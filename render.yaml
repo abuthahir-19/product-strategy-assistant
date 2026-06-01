@@ -1,0 +1,69 @@
+# Render Blueprint — AI-Powered Product Strategy Assistant
+# Defines both services (backend + frontend) for one-click deployment.
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+
+  # ──────────────────────────────────────────────────────────────────────
+  #  SERVICE 1 — FastAPI Backend
+  # ──────────────────────────────────────────────────────────────────────
+  - type: web
+    name: product-strategy-api
+    runtime: python
+    plan: free                          # upgrade to starter for more RAM
+    buildCommand: pip install -r requirements.txt
+    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    envVars:
+
+      # ── Required secrets (set manually in Render dashboard) ──────────
+      - key: OPENAI_API_KEY
+        sync: false                     # set in Render → Environment tab
+
+      # ── Gateway config ───────────────────────────────────────────────
+      - key: OPENAI_BASE_URL
+        value: https://keygateway.arshnivlabs.com/v1
+
+      # ── Model settings ───────────────────────────────────────────────
+      - key: LLM_MODEL
+        value: gpt-4o-mini
+      - key: EMBEDDING_MODEL
+        value: text-embedding-3-small
+      - key: TEMPERATURE
+        value: "0.3"
+      - key: MAX_TOKENS
+        value: "2000"
+
+      # ── Document processing ──────────────────────────────────────────
+      - key: CHUNK_SIZE
+        value: "1000"
+      - key: CHUNK_OVERLAP
+        value: "200"
+      - key: MAX_RETRIEVAL_DOCS
+        value: "5"
+
+      # ── ChromaDB — use /tmp so it's always writable on Render ────────
+      - key: CHROMA_PERSIST_DIR
+        value: /tmp/chroma_db
+
+  # ──────────────────────────────────────────────────────────────────────
+  #  SERVICE 2 — Streamlit Frontend
+  # ──────────────────────────────────────────────────────────────────────
+  - type: web
+    name: product-strategy-ui
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: >-
+      streamlit run frontend/app.py
+      --server.port $PORT
+      --server.address 0.0.0.0
+      --server.headless true
+      --server.enableCORS false
+      --server.enableXsrfProtection false
+    envVars:
+
+      # Set this AFTER the backend service is deployed and you have its URL.
+      # Format: https://product-strategy-api.onrender.com
+      - key: BACKEND_URL
+        sync: false                     # set in Render → Environment tab

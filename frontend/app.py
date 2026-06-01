@@ -1,4 +1,5 @@
 """Streamlit frontend — AI Product Strategy Assistant."""
+import os
 import time
 from pathlib import Path
 
@@ -15,7 +16,8 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-BACKEND_URL = "http://localhost:8000"
+# Read from environment so the same codebase works locally and on Render
+BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000").rstrip("/")
 
 # ------------------------------------------------------------------ #
 #  CSS                                                                 #

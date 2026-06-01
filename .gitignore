@@ -1,0 +1,38 @@
+# ── Secrets ────────────────────────────────────────────────────────────
+.env
+
+# ── ChromaDB vector store (regenerated on upload) ──────────────────────
+chroma_db/
+backend/chroma_db/
+**/chroma_db/
+
+# ── Python compiled files ───────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ── Virtual environments ────────────────────────────────────────────────
+venv/
+.venv/
+env/
+.env/
+
+# ── IDE & OS ────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Test / temp artefacts ───────────────────────────────────────────────
+test_report.pdf
+*.log
+*.tmp
+
+# ── Jupyter ─────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
