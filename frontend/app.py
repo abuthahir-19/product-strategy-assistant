@@ -426,7 +426,12 @@ with tab_analysis:
             st.error(f"Analysis error: {data['error']}")
 
         # Summary metrics
-        completed_count = sum(1 for _, k in AGENTS if data.get(k))
+        _ALL_OUTPUT_KEYS = [
+            "customer_insights", "market_research", "competitor_analysis",
+            "swot_analysis", "feature_priorities", "strategy_recommendations",
+            "executive_summary",
+        ]
+        completed_count = sum(1 for k in _ALL_OUTPUT_KEYS if data.get(k))
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Agents Completed", f"{completed_count}/7")
         m2.metric("Chunks Analysed", store_docs := get_status().get("documents_loaded", 0))
