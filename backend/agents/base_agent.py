@@ -38,6 +38,7 @@ class BaseAgent:
             temperature=TEMPERATURE,
             max_tokens=MAX_TOKENS,
             http_client=_HTTP_CLIENT,
+            request_timeout=90,   # cap each LLM call at 90s — prevents hanging
         )
         self._store = ChromaVectorStore()
 

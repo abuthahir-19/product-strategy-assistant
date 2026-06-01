@@ -325,8 +325,8 @@ with st.sidebar:
 status = get_status()
 if status.get("running"):
     step = status.get("current_step", "Processing…")
-    with st.spinner(f"Analysis in progress — {step}"):
-        time.sleep(4)
+    with st.spinner(f"⏳ {step}"):
+        time.sleep(2)   # poll every 2 s so partial results appear quickly
     st.rerun()
 elif st.session_state.poll_analysis and status.get("completed"):
     st.session_state.poll_analysis = False

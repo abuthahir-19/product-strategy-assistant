@@ -314,6 +314,24 @@ def run_analysis(seed: Optional[dict] = None) -> dict:
     return _get_graph().invoke(state)
 
 
+def stream_analysis(seed: Optional[dict] = None):
+    """
+    Yield a progressively updated state dict after every agent node completes.
+    Lets the backend expose partial results while analysis is still running.
+    """
+    state = _blank_state()
+    if seed:
+        state.update(seed)
+    state["mode"] = "analyze"
+
+    accumulated = dict(state)
+    for chunk in _get_graph().stream(state, stream_mode="updates"):
+        # chunk = { node_name: { field: value, ... } }
+        for _node, changes in chunk.items():
+            accumulated.update(changes)
+        yield dict(accumulated)
+
+
 def run_chat(query: str, chat_history: List[dict], analysis_state: Optional[dict] = None) -> dict:
     """Run the RAG chat node and return the updated state."""
     state = _blank_state()

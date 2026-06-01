@@ -12,7 +12,7 @@ from pydantic import BaseModel
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import OPENAI_API_KEY
-from orchestrator.workflow import run_analysis, run_chat
+from orchestrator.workflow import stream_analysis, run_chat
 from utils.document_processor import DocumentProcessor
 from utils.pdf_generator import generate_pdf_report
 from vector_store.chroma_store import ChromaVectorStore
@@ -128,9 +128,12 @@ def start_analysis(background_tasks: BackgroundTasks):
     def _run():
         _state["analysis_running"] = True
         _state["error"] = None
+        _state["analysis_result"] = None   # clear any previous run
         try:
-            result = run_analysis()
-            _state["analysis_result"] = result
+            # stream_analysis() yields partial state after every agent node —
+            # results appear in /api/results as each agent finishes
+            for partial in stream_analysis():
+                _state["analysis_result"] = partial
         except Exception as exc:
             _state["error"] = str(exc)
         finally:
@@ -142,13 +145,26 @@ def start_analysis(background_tasks: BackgroundTasks):
 
 @app.get("/api/results", tags=["Analysis"])
 def get_results():
-    """Return the latest analysis results."""
-    if not _state["analysis_result"]:
+    """
+    Return analysis results — partial while running, full when done.
+    'completed' is True whenever any agent has produced output, so the
+    frontend can render sections incrementally rather than waiting for all 7.
+    """
+    r = _state["analysis_result"]
+    if not r:
         return {"completed": False, "data": None}
 
-    r = _state["analysis_result"]
+    # Has at least one agent finished?
+    has_data = any(
+        r.get(k) for k in [
+            "customer_insights", "market_research", "competitor_analysis",
+            "swot_analysis", "feature_priorities", "strategy_recommendations",
+            "executive_summary",
+        ]
+    )
     return {
-        "completed": True,
+        "completed": has_data,          # show sections as soon as one agent done
+        "still_running": _state["analysis_running"],
         "data": {
             "customer_insights": r.get("customer_insights"),
             "market_research": r.get("market_research"),
