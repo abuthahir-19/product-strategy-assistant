@@ -119,8 +119,15 @@ def _delete(path: str):
 
 
 def backend_alive() -> bool:
-    r = _get("/")
-    return r is not None and r.status_code == 200
+    """Try up to 3 times with increasing timeouts to handle Render cold starts."""
+    for timeout in (5, 10, 20):
+        try:
+            r = requests.get(f"{BACKEND_URL}/", timeout=timeout)
+            if r.status_code == 200:
+                return True
+        except Exception:
+            pass
+    return False
 
 
 def get_status() -> dict:
@@ -176,11 +183,23 @@ st.markdown("""
 #  Backend health check                                                #
 # ------------------------------------------------------------------ #
 if not backend_alive():
-    st.error(
-        "**Backend server not running.**  "
-        "Open a terminal, `cd backend`, then run:  \n"
-        "```\npython main.py\n```"
-    )
+    is_local = "localhost" in BACKEND_URL or "127.0.0.1" in BACKEND_URL
+    if is_local:
+        st.error(
+            "**Backend server is not running.**  \n\n"
+            "Open a terminal and run:\n"
+            "```\ncd backend\npython main.py\n```"
+        )
+    else:
+        st.error(
+            f"**Cannot reach the backend API.**  \n\n"
+            f"Configured URL: `{BACKEND_URL}`  \n\n"
+            "**Check the following in your Render dashboard:**\n"
+            "1. The **backend service** (`product-strategy-api`) is deployed and shows **Live**\n"
+            "2. The **frontend service** has `BACKEND_URL` set to the backend's Render URL\n"
+            "3. The backend URL should be `https://your-service-name.onrender.com` (no port number)\n\n"
+            "The backend may also be waking up from idle — wait 30 seconds and refresh."
+        )
     st.stop()
 
 # ------------------------------------------------------------------ #
