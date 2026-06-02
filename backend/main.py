@@ -154,16 +154,12 @@ def get_results():
     if not r:
         return {"completed": False, "data": None}
 
-    # Has at least one agent finished?
-    has_data = any(
-        r.get(k) for k in [
-            "customer_insights", "market_research", "competitor_analysis",
-            "swot_analysis", "feature_priorities", "strategy_recommendations",
-            "executive_summary",
-        ]
-    )
+    # completed = True as soon as the analysis pipeline has run at least once
+    # (regardless of whether individual agents succeeded or failed).
+    # The frontend uses this to switch from the "upload data" screen to the
+    # results screen, where errors/missing sections are shown explicitly.
     return {
-        "completed": has_data,          # show sections as soon as one agent done
+        "completed": not _state["analysis_running"],
         "still_running": _state["analysis_running"],
         "data": {
             "customer_insights": r.get("customer_insights"),

@@ -332,6 +332,21 @@ elif st.session_state.poll_analysis and status.get("completed"):
     st.session_state.poll_analysis = False
 
 # ------------------------------------------------------------------ #
+#  Shared constants (used in both Analysis and Report tabs)            #
+# ------------------------------------------------------------------ #
+SECTION_DEFS = [
+    ("📋 Executive Summary",       "executive_summary",        True),
+    ("👥 Customer Insights",       "customer_insights",        False),
+    ("📈 Market Research",         "market_research",          False),
+    ("🏆 Competitor Analysis",     "competitor_analysis",      False),
+    ("🎯 SWOT Analysis",           "swot_analysis",            False),
+    ("⭐ Feature Prioritization",  "feature_priorities",       False),
+    ("🚀 Strategic Recommendations","strategy_recommendations", False),
+]
+
+_ALL_OUTPUT_KEYS = [key for _, key, _ in SECTION_DEFS]
+
+# ------------------------------------------------------------------ #
 #  Main tabs                                                           #
 # ------------------------------------------------------------------ #
 tab_chat, tab_analysis, tab_report = st.tabs([
@@ -422,43 +437,51 @@ with tab_analysis:
     else:
         data = results["data"]
 
-        if data.get("error"):
-            st.error(f"Analysis error: {data['error']}")
+        # ── Error banner ─────────────────────────────────────────────
+        err = data.get("error", "")
+        if err:
+            if "proxy" in err.lower() or "mcafee" in err.lower() or "firewall" in err.lower():
+                st.error(
+                    "**Corporate network proxy is blocking LLM calls.**  \n"
+                    "Test via the Render-deployed URL or switch to a mobile hotspot."
+                )
+            elif "Connection error" in err or "gateway" in err.lower():
+                st.error(f"**Gateway connection failed.** Check `OPENAI_BASE_URL` in your environment.  \n`{err}`")
+            else:
+                st.warning(f"**Partial error during analysis:** {err}")
 
-        # Summary metrics
-        _ALL_OUTPUT_KEYS = [
-            "customer_insights", "market_research", "competitor_analysis",
-            "swot_analysis", "feature_priorities", "strategy_recommendations",
-            "executive_summary",
-        ]
+        # ── Summary metrics ──────────────────────────────────────────
         completed_count = sum(1 for k in _ALL_OUTPUT_KEYS if data.get(k))
+        still_running   = results.get("still_running", False)
+
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Agents Completed", f"{completed_count}/7")
-        m2.metric("Chunks Analysed", store_docs := get_status().get("documents_loaded", 0))
+        m2.metric("Chunks in DB", get_status().get("documents_loaded", 0))
         m3.metric("Report Sections", completed_count)
-        m4.metric("Status", "✅ Complete" if completed_count == 7 else "⚡ Partial")
+        m4.metric("Status",
+            "⏳ Running…"   if still_running else
+            "✅ Complete"   if completed_count == 7 else
+            "⚠️ Partial"    if completed_count > 0 else
+            "❌ No output — check error above"
+        )
 
-        st.markdown("---")
-
-        # Display each section
-        SECTION_DEFS = [
-            ("📋 Executive Summary",                  "executive_summary",         True),
-            ("👥 Customer Insights Report",           "customer_insights",         False),
-            ("📈 Market Research Summary",            "market_research",           False),
-            ("🏆 Competitor Analysis",                "competitor_analysis",        False),
-            ("🎯 SWOT Analysis",                      "swot_analysis",             False),
-            ("⭐ Feature Prioritization",             "feature_priorities",         False),
-            ("🚀 Strategic Recommendations",          "strategy_recommendations",  False),
-        ]
-
-        for title, key, expanded in SECTION_DEFS:
-            content = data.get(key, "")
-            if content:
-                with st.expander(title, expanded=expanded):
-                    st.markdown(content)
-            else:
-                with st.expander(f"{title} *(not available)*", expanded=False):
-                    st.caption("This section was not generated. Re-run the analysis after uploading relevant documents.")
+        if completed_count == 0 and not still_running:
+            st.info(
+                "No agent output was produced. This usually means:\n"
+                "1. All LLM calls were blocked (corporate proxy / McAfee)\n"
+                "2. The API key or gateway URL is wrong\n\n"
+                "Check the error banner above and re-run after fixing."
+            )
+        else:
+            st.markdown("---")
+            for title, key, expanded in SECTION_DEFS:
+                content = data.get(key, "")
+                if content:
+                    with st.expander(title, expanded=expanded):
+                        st.markdown(content)
+                else:
+                    with st.expander(f"{title} *(pending…)*", expanded=False):
+                        st.caption("This section has not completed yet — it will appear as agents finish.")
 
 # ================================================================== #
 #  TAB 3 — REPORT & DOWNLOAD                                          #
@@ -472,24 +495,36 @@ with tab_report:
 
     with left:
         if results.get("completed"):
-            st.success("✅ Analysis complete — your report is ready.")
+            data = results.get("data") or {}
+            sections_done = sum(1 for k in _ALL_OUTPUT_KEYS if data.get(k))
 
-            pdf = download_pdf()
-            if pdf:
-                st.download_button(
-                    label="⬇️ Download PDF Strategy Report",
-                    data=pdf,
-                    file_name="product_strategy_report.pdf",
-                    mime="application/pdf",
-                    use_container_width=True,
+            if sections_done == 0:
+                st.warning(
+                    "Analysis ran but produced no output — likely blocked by a network proxy.  \n"
+                    "Check the **Analysis Results** tab for details."
                 )
             else:
-                st.warning("PDF generation is unavailable. Check that `reportlab` is installed.")
+                if sections_done == 7:
+                    st.success("✅ Analysis complete — your report is ready.")
+                else:
+                    st.info(f"⚡ Partial analysis ({sections_done}/7 sections) — PDF includes available sections.")
 
-            st.markdown("### Report Contents")
-            for idx, (title, key, _) in enumerate(SECTION_DEFS, 1):
-                icon = "✅" if results["data"].get(key) else "⬜"
-                st.markdown(f"{icon} **{idx}.** {title.split(' ', 1)[1]}")
+                pdf = download_pdf()
+                if pdf:
+                    st.download_button(
+                        label="⬇️ Download PDF Strategy Report",
+                        data=pdf,
+                        file_name="product_strategy_report.pdf",
+                        mime="application/pdf",
+                        use_container_width=True,
+                    )
+                else:
+                    st.warning("PDF generation is unavailable. Check that `reportlab` is installed.")
+
+                st.markdown("### Report Contents")
+                for idx, (title, key, _) in enumerate(SECTION_DEFS, 1):
+                    icon = "✅" if data.get(key) else "⬜"
+                    st.markdown(f"{icon} **{idx}.** {title.split(' ', 1)[1]}")
         else:
             st.info("Run the analysis first to generate a downloadable report.")
             st.markdown("""
