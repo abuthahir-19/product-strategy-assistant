@@ -62,25 +62,25 @@ The **AI-Powered Product Strategy Assistant** solves this by:
 └────────────────────────────────┬────────────────────────────────────────┘
                                  │ HTTP (REST)
                                  ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         FASTAPI BACKEND (:8000)                         │
+┌──────────────────────────────────────────────────────────────────────────┐
+│                         FASTAPI BACKEND (:8000)                          │
 │  /api/upload  /api/analyze  /api/results  /api/chat  /api/report/download│
-└───────────┬─────────────────────────────────────────────┬───────────────┘
+└───────────┬─────────────────────────────────────────────┬────────────────┘
             │                                             │
             ▼                                             ▼
-┌───────────────────────────┐               ┌─────────────────────────────┐
-│   DOCUMENT PROCESSOR      │               │   LANGGRAPH ORCHESTRATOR    │
-│                           │               │                             │
-│  PDF / CSV / TXT / DOCX   │               │  7-Agent Sequential Pipeline│
-│          ↓                │               │  + RAG Chat Node            │
-│  RecursiveCharacterSplitter│               └──────────────┬──────────────┘
-│          ↓                │                              │
-│  Chunked Documents        │                              │ LLM Calls
-└───────────┬───────────────┘                              ▼
+┌────────────────────────────┐               ┌─────────────────────────────┐
+│   DOCUMENT PROCESSOR       │               │   LANGGRAPH ORCHESTRATOR    │
+│                            │               │                             │
+│  PDF / CSV / TXT / DOCX    │               │  7-Agent Sequential Pipeline│
+│          ↓                 │               │  + RAG Chat Node            │
+│  RecursiveCharacterSplitter│               └───────────────┬─────────────┘
+│          ↓                 │                               │
+│  Chunked Documents         │                               │ LLM Calls
+└───────────┬────────────────┘                               ▼
             │ embed_documents()              ┌─────────────────────────────┐
-            ▼                               │  GPT-4o Mini via Gateway    │
-┌───────────────────────────┐               │  https://keygateway...com/v1│
-│   CHROMADB VECTOR STORE   │               └─────────────────────────────┘
+            ▼                                │  GPT-4o Mini via Gateway    │
+┌───────────────────────────┐                │  https://keygateway...com/v1│
+│   CHROMADB VECTOR STORE   │                └─────────────────────────────┘
 │                           │
 │  Local ONNX MiniLM        │◄── similarity_search() ── Agent RAG Retrieval
 │  Embeddings (offline)     │
@@ -100,53 +100,53 @@ The analysis runs as a **directed acyclic graph** compiled by LangGraph. Each no
 ```
 START
   │
-  ├─(mode = "analyze")──────────────────────────────────────────────┐
+  ├─(mode = "analyze")───────────────────────────────────────────────┐
   │                                                                  │
-  │   ┌─────────────────────────────────────────────────────────┐   │
-  │   │                  ANALYSIS PIPELINE                      │   │
-  │   │                                                         │   │
-  │   │  [1] Customer Feedback Agent                            │   │
-  │   │       • Sentiment analysis & rating trends              │   │
-  │   │       • Top pain points & complaints (Top 5)            │   │
-  │   │       • Most-requested features                         │   │
-  │   │       • At-risk customer signals                        │   │
-  │   │              ↓                                          │   │
-  │   │  [2] Market Research Agent                              │   │
-  │   │       • Revenue & profitability trends                  │   │
-  │   │       • Best/worst performing products & regions        │   │
-  │   │       • Marketing ROI analysis                          │   │
-  │   │       • Growth opportunities                            │   │
-  │   │              ↓                                          │   │
-  │   │  [3] Competitor Analysis Agent                          │   │
-  │   │       • Competitive landscape mapping                   │   │
-  │   │       • Competitor strengths & weaknesses               │   │
-  │   │       • Feature & positioning gaps                      │   │
-  │   │       • Differentiation recommendations                 │   │
-  │   │              ↓                                          │   │
-  │   │  [4] SWOT Analysis Agent  ← synthesises [1][2][3]      │   │
-  │   │       • 5–7 items per quadrant, all data-backed         │   │
-  │   │       • SO / ST / WO / WT strategic implications        │   │
-  │   │              ↓                                          │   │
-  │   │  [5] Feature Prioritization Agent                       │   │
-  │   │       • RICE scoring & MoSCoW classification            │   │
-  │   │       • Priority Tier 1–4 with rationale                │   │
-  │   │       • Quick-win identification                        │   │
-  │   │              ↓                                          │   │
-  │   │  [6] Strategy Recommendation Agent                      │   │
-  │   │       • 12-month strategic vision                       │   │
-  │   │       • Q1–Q4 product roadmap                           │   │
-  │   │       • 30 / 60 / 90 day action plan                    │   │
-  │   │       • KPIs & success metrics                          │   │
-  │   │              ↓                                          │   │
-  │   │  [7] Executive Report Agent                             │   │
-  │   │       • C-suite executive summary (≤600 words)          │   │
-  │   │       • Key findings, opportunities, risks              │   │
-  │   │       • Immediate action items                          │   │
-  │   └─────────────────────────────────────────────────────────┘   │
+  │   ┌─────────────────────────────────────────────────────────┐    │
+  │   │                  ANALYSIS PIPELINE                      │    │
+  │   │                                                         │    │
+  │   │  [1] Customer Feedback Agent                            │    │
+  │   │       • Sentiment analysis & rating trends              │    │
+  │   │       • Top pain points & complaints (Top 5)            │    │
+  │   │       • Most-requested features                         │    │
+  │   │       • At-risk customer signals                        │    │
+  │   │              ↓                                          │    │
+  │   │  [2] Market Research Agent                              │    │
+  │   │       • Revenue & profitability trends                  │    │
+  │   │       • Best/worst performing products & regions        │    │
+  │   │       • Marketing ROI analysis                          │    │
+  │   │       • Growth opportunities                            │    │
+  │   │              ↓                                          │    │
+  │   │  [3] Competitor Analysis Agent                          │    │
+  │   │       • Competitive landscape mapping                   │    │
+  │   │       • Competitor strengths & weaknesses               │    │
+  │   │       • Feature & positioning gaps                      │    │
+  │   │       • Differentiation recommendations                 │    │
+  │   │              ↓                                          │    │
+  │   │  [4] SWOT Analysis Agent  ← synthesises [1][2][3]       │    │
+  │   │       • 5–7 items per quadrant, all data-backed         │    │
+  │   │       • SO / ST / WO / WT strategic implications        │    │
+  │   │              ↓                                          │    │
+  │   │  [5] Feature Prioritization Agent                       │    │
+  │   │       • RICE scoring & MoSCoW classification            │    │
+  │   │       • Priority Tier 1–4 with rationale                │    │
+  │   │       • Quick-win identification                        │    │
+  │   │              ↓                                          │    │
+  │   │  [6] Strategy Recommendation Agent                      │    │
+  │   │       • 12-month strategic vision                       │    │
+  │   │       • Q1–Q4 product roadmap                           │    │
+  │   │       • 30 / 60 / 90 day action plan                    │    │
+  │   │       • KPIs & success metrics                          │    │
+  │   │              ↓                                          │    │
+  │   │  [7] Executive Report Agent                             │    │
+  │   │       • C-suite executive summary (≤600 words)          │    │
+  │   │       • Key findings, opportunities, risks              │    │
+  │   │       • Immediate action items                          │    │
+  │   └─────────────────────────────────────────────────────────┘    │
   │                              ↓                                   │
   │                             END                                  │
   │                                                                  │
-  └─(mode = "chat")──► [RAG Chat Node] ──► END                      │
+  └─(mode = "chat")──► [RAG Chat Node] ──► END                       │
                          • Retrieves top-K chunks from ChromaDB      │
                          • Injects completed agent outputs as context│
                          • Answers with grounded, cited responses    │
