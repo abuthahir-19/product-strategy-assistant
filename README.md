@@ -14,12 +14,13 @@
 6. [Project Structure](#project-structure)
 7. [Getting Started](#getting-started)
 8. [How to Use the App](#how-to-use-the-app)
-9. [Supported Input Formats](#supported-input-formats)
-10. [Expected Outputs](#expected-outputs)
-11. [API Reference](#api-reference)
-12. [Configuration Reference](#configuration-reference)
-13. [Evaluation Criteria Coverage](#evaluation-criteria-coverage)
-14. [Bonus Features](#bonus-features)
+9. [Application Screenshots](#application-screenshots)
+10. [Supported Input Formats](#supported-input-formats)
+11. [Expected Outputs](#expected-outputs)
+12. [API Reference](#api-reference)
+13. [Configuration Reference](#configuration-reference)
+14. [Evaluation Criteria Coverage](#evaluation-criteria-coverage)
+15. [Bonus Features](#bonus-features)
 
 ---
 
@@ -353,6 +354,56 @@ The assistant retrieves relevant document chunks from ChromaDB and uses complete
 Go to the **Report & Download** tab and click **⬇ Download PDF Strategy Report**.
 
 The PDF includes all seven analysis sections with a cover page, table of contents, and professional formatting.
+
+---
+
+## Application Screenshots
+
+### Chat Assistant
+
+![Chat Assistant](images/chat-window.png)
+
+The RAG-powered chat interface. After uploading documents, ask natural language questions about your data. Suggested prompts help new users get started, and the sidebar confirms how many chunks are indexed and ready for analysis.
+
+---
+
+### Analysis Results — Status Dashboard
+
+![Analysis Results Overview](images/analysis-window.png)
+
+The Analysis Results tab immediately after a completed run. The status dashboard confirms all 7 agents have finished, shows the number of document chunks indexed (240), the number of report sections generated (7), and marks the overall status as **Complete**. The sidebar lists all agent pipeline phases with green check marks.
+
+---
+
+### Analysis Results — All Sections
+
+![Analysis Results Sections](images/analysis-window-2.png)
+
+All seven collapsible report sections displayed at a glance: Executive Summary, Customer Insights, Market Research, Competitor Analysis, SWOT Analysis, Feature Prioritization, and Strategic Recommendations. Each section can be expanded independently to read the full agent output.
+
+---
+
+### Executive Summary — Expanded
+
+![Executive Summary](images/analysis-window-3.png)
+
+The Executive Summary section expanded, showing the **Situation** overview and **Key Findings** — including average customer satisfaction scores, profit margin analysis, emerging pain points, and competitive landscape highlights — all derived from the uploaded data.
+
+---
+
+### Customer Insights Report — Expanded
+
+![Customer Insights](images/analysis-window-4.png)
+
+The Customer Insights Report section expanded, displaying the Executive Overview and a **Sentiment Analysis** breakdown (positive / neutral / negative percentages) backed by the uploaded customer review data.
+
+---
+
+### Report & Download
+
+![Report and Download](images/final-reports-page.png)
+
+The Report & Download tab once analysis is complete. A single button downloads the full multi-section PDF report. The right-hand panel shows the system architecture diagram illustrating the data ingestion, ChromaDB vector store, and RAG retrieval flow.
 
 ---
 
